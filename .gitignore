@@ -1,20 +1,88 @@
-# .gitignore (根目录)
-
-# 通用
-node_modules/
+# ========================
+# 🔒 安全：永远不要提交私钥/密钥
+# ========================
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+keystore/
+secrets/
+
+# ========================
+# 🧱 通用：Node.js & 包管理
+# ========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.yarn/
+package-lock.json      # 可选：如果你用 yarn 或 pnpm
+yarn.lock               # 可选：如果你用 npm 或 pnpm
+
+# ========================
+# ⚙️ Hardhat / Ethers / Web3 工具链
+# ========================
+artifacts/              # Hardhat 编译产物
+cache/                  # Hardhat 缓存
+coverage/               # 测试覆盖率报告
+typechain-types/        # TypeChain 生成的类型
+typechain/              
+build/                  # 通用构建目录（也用于 Foundry）
+out/                    # Foundry 编译输出 (foundry.toml 默认)
+broadcast/              # Foundry 脚本部署记录
+.anvil/                 # Anvil 本地节点数据
+
+# ========================
+# 🌐 前端：React / Vite / Next.js
+# ========================
+dist/
+public/build/
+.next/
+.nuxt/
+.cache/
+.parcel-cache/
+.vercel/
+.netlify/
+
+# Vite
+vite.config.*.timestamp
+
+# Create React App
+build/
+static/
+
+# General frontend
+*.log
+npm-debug.log*
+
+# ========================
+# 💾 IDE / 编辑器
+# ========================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
 .DS_Store
 Thumbs.db
 
-# Hardhat / Foundry
-artifacts/
-cache/
-build/
-*.log
+# ========================
+# 🐳 Docker（可选）
+# ========================
+.dockerignore
+docker-compose.override.yml
 
-# React / Vite
-dist/
-build/
-out/
-public/build/
-.env.local
+# ========================
+# 🧪 其他临时文件
+# ========================
+tmp/
+temp/
+logs/
+*.log
