@@ -13,4 +13,8 @@ contract SimpleStorage {
     function retrieve() public view returns (uint256) {
         return value;
     }
+
+    function increment() public {
+        value += 1;
+    }
 }
