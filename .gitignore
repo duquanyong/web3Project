@@ -1,17 +1,20 @@
-# Node.js
+# .gitignore (根目录)
+
+# 通用
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Hardhat
-cache/
-artifacts/
-
-# Environment variables
 .env
-.env.local
-
-# IDE
-.vscode/
 .DS_Store
+Thumbs.db
+
+# Hardhat / Foundry
+artifacts/
+cache/
+build/
+*.log
+
+# React / Vite
+dist/
+build/
+out/
+public/build/
+.env.local
