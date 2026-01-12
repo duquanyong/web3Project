@@ -4,7 +4,8 @@ import { ethers } from 'ethers';
 import { SIMPLE_STORAGE_ABI } from './contracts/simpleStorageAbi';
 
 // 你的合约地址（Sepolia）
-const CONTRACT_ADDRESS = "0xe400DA0D30295591D0285D69ccDcB30f83c6948f";
+// const CONTRACT_ADDRESS = "0xe400DA0D30295591D0285D69ccDcB30f83c6948f";
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
 
 function App() {
   const [currentValue, setCurrentValue] = useState(null);
