@@ -4,30 +4,60 @@ import { ethers } from 'ethers';
 import { SIMPLE_STORAGE_ABI } from './contracts/simpleStorageAbi';
 
 // 你的合约地址（Sepolia）
-const CONTRACT_ADDRESS = "0x81007488b6d495b3f9f0cd8Cf749e9a9AAbE6Cbb";
+const CONTRACT_ADDRESS = "0xe400DA0D30295591D0285D69ccDcB30f83c6948f";
 
 function App() {
   const [currentValue, setCurrentValue] = useState(null);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [contract, setContract] = useState(null); // 👈 新增：缓存 contract 实例
 
-  // 读取当前存储值
-  const loadCurrentValue = async () => {
-    try {
-      if (window.ethereum) {
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, SIMPLE_STORAGE_ABI, provider);
-        const value = await contract.retrieve();
-        setCurrentValue(value.toString());
-      } else {
-        setError("请安装 MetaMask 钱包");
-      }
-    } catch (err) {
-      console.error(err);
-      setError("读取失败: " + err.message);
+  // 初始化 provider 和 contract（只运行一次）
+  useEffect(() => {
+    if (window.ethereum) {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, SIMPLE_STORAGE_ABI, provider);
+      setContract(contract);
+    } else {
+      setError("请安装 MetaMask 钱包");
     }
-  };
+  }, []);
+
+  // 👇 新增：监听 ValueChanged 事件
+  useEffect(() => {
+    if (!contract) return;
+
+    const handleValueChanged = (oldValue, newValue) => {
+      console.log("监听页面收到事件:", { oldValue: oldValue.toString(), newValue: newValue.toString() });
+      setCurrentValue(newValue.toString()); // 自动更新 UI
+    };
+
+    // 开始监听
+    contract.on("ValueChanged", handleValueChanged);
+
+    // 清理监听器（重要！）
+    return () => {
+      contract.off("ValueChanged", handleValueChanged);
+    };
+  }, [contract]);
+
+  // 首次加载时读取当前值
+  useEffect(() => {
+    const loadCurrentValue = async () => {
+      try {
+        if (contract) {
+          const value = await contract.retrieve();
+          setCurrentValue(value.toString());
+        }
+      } catch (err) {
+        console.error(err);
+        setError("读取失败: " + err.message);
+      }
+    };
+
+    loadCurrentValue();
+  }, [contract]);
 
   // 存储新值
   const handleStore = async () => {
@@ -40,20 +70,20 @@ function App() {
       setLoading(true);
       setError("");
 
-      if (window.ethereum) {
+      if (window.ethereum && contract) {
         // 请求用户授权
         await window.ethereum.request({ method: "eth_requestAccounts" });
-        
+
         const provider = new ethers.BrowserProvider(window.ethereum);
         const signer = await provider.getSigner();
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, SIMPLE_STORAGE_ABI, signer);
+        const contractWithSigner = contract.connect(signer); // 使用已有的 ABI 和地址
 
         // 发送交易
-        const tx = await contract.store(inputValue);
+        const tx = await contractWithSigner.store(inputValue);
         await tx.wait(); // 等待确认
 
-        // 更新显示
-        await loadCurrentValue();
+        // ✅ 不再手动调用 loadCurrentValue()
+        // 因为事件会自动触发 UI 更新！
         setInputValue("");
       } else {
         setError("请安装 MetaMask");
@@ -65,11 +95,6 @@ function App() {
       setLoading(false);
     }
   };
-
-  // 页面加载时读取当前值
-  useEffect(() => {
-    loadCurrentValue();
-  }, []);
 
   return (
     <div style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto", fontFamily: "sans-serif" }}>

@@ -45,4 +45,14 @@ describe("SimpleStorage", function () {
     expect(val1).to.equal(999n);
     expect(val2).to.equal(999n);
   });
+
+
+  it("Should emit event on increment", async () => {
+    await simpleStorage.store(5n);
+    await expect(simpleStorage.increment())
+      .to.emit(simpleStorage, "ValueChanged")
+      .withArgs(5n, 6n);
+  });
+
+
 });
