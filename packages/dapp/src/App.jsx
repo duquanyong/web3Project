@@ -2,10 +2,13 @@
 import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import { SIMPLE_STORAGE_ABI } from './contracts/simpleStorageAbi';
+import { myTokenAbi } from './contracts/MyTokenAbi'; // ← 新增
 
 // 你的合约地址（Sepolia）
-// const CONTRACT_ADDRESS = "0xe400DA0D30295591D0285D69ccDcB30f83c6948f";
+ 
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS;
+const TOKEN_ADDRESS = import.meta.env.VITE_TOKEN_ADDRESS; // ← 从环境变量读
+ 
 
 function App() {
   const [currentValue, setCurrentValue] = useState(null);
@@ -13,6 +16,62 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [contract, setContract] = useState(null); // 👈 新增：缓存 contract 实例
+
+  // === 新增：代币相关状态 ===
+  const [tokenBalance, setTokenBalance] = useState("0");
+  const [transferTo, setTransferTo] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [account, setAccount] = useState(null); // 👈 新增！
+
+    // 获取代币余额
+    const fetchTokenBalance = async () => {
+      if (!window.ethereum || !account) return;
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = new ethers.Contract(TOKEN_ADDRESS, myTokenAbi, provider);
+      const balance = await contract.balanceOf(account);
+      const decimals = await contract.decimals();
+      const formatted = ethers.formatUnits(balance, decimals);
+      setTokenBalance(formatted);
+    };
+
+   // 转账
+   const handleTransfer = async () => {
+    if (!window.ethereum || !account) return;
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(TOKEN_ADDRESS, myTokenAbi, signer);
+
+    const decimals = await contract.decimals();
+    const amount = ethers.parseUnits(transferAmount, decimals);
+
+    const tx = await contract.transfer(transferTo, amount);
+    await tx.wait(); // 等待确认
+    alert("转账成功！");
+    fetchTokenBalance(); // 刷新余额
+  };
+
+  // 新增：连接钱包并获取账户
+  const connectWallet = async () => {
+    if (!window.ethereum) {
+      setError("请安装 MetaMask");
+      return;
+    }
+    try {
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      setAccount(accounts[0]);
+    } catch (err) {
+      setError("用户拒绝连接钱包");
+    }
+  };
+
+  // 在 useEffect 中自动尝试连接（可选）
+  useEffect(() => {
+    if (window.ethereum) {
+      window.ethereum.request({ method: "eth_accounts" }).then(accounts => {
+        if (accounts.length > 0) setAccount(accounts[0]);
+      });
+    }
+  }, []);
 
   // 初始化 provider 和 contract（只运行一次）
   useEffect(() => {
@@ -43,6 +102,34 @@ function App() {
     };
   }, [contract]);
 
+  // 监听 Transfer 事件（自动更新）
+  useEffect(() => {
+    if (!window.ethereum || !account) return;
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const contract = new ethers.Contract(TOKEN_ADDRESS, myTokenAbi, provider);
+
+    const handleTransferEvent = (from, to, value) => {
+      if (from.toLowerCase() === account.toLowerCase() || 
+          to.toLowerCase() === account.toLowerCase()) {
+        console.log("监听页面收到 Transfer 事件:", { from, to, value });
+        fetchTokenBalance(); // 自动刷新
+      }
+    };
+
+    contract.on("Transfer", handleTransferEvent);
+
+    return () => {
+      contract.off("Transfer", handleTransferEvent);
+    };
+  }, [account]);
+
+  // 在连接钱包后获取余额
+  useEffect(() => {
+    if (account) {
+      fetchTokenBalance();
+    }
+  }, [account]);
+
   // 首次加载时读取当前值
   useEffect(() => {
     const loadCurrentValue = async () => {
@@ -61,41 +148,43 @@ function App() {
   }, [contract]);
 
   // 存储新值
-  const handleStore = async () => {
-    if (!inputValue || isNaN(inputValue)) {
-      setError("请输入有效数字");
+// 存储新值
+const handleStore = async () => {
+  if (!inputValue || isNaN(inputValue)) {
+    setError("请输入有效数字");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    setError("");
+
+    if (!window.ethereum || !contract) {
+      setError("请安装 MetaMask");
       return;
     }
 
-    try {
-      setLoading(true);
-      setError("");
-
-      if (window.ethereum && contract) {
-        // 请求用户授权
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const signer = await provider.getSigner();
-        const contractWithSigner = contract.connect(signer); // 使用已有的 ABI 和地址
-
-        // 发送交易
-        const tx = await contractWithSigner.store(inputValue);
-        await tx.wait(); // 等待确认
-
-        // ✅ 不再手动调用 loadCurrentValue()
-        // 因为事件会自动触发 UI 更新！
-        setInputValue("");
-      } else {
-        setError("请安装 MetaMask");
-      }
-    } catch (err) {
-      console.error(err);
-      setError("交易失败: " + err.message);
-    } finally {
-      setLoading(false);
+    // 👇 关键修复：获取账户并更新状态
+    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    const currentAccount = accounts[0];
+    if (account !== currentAccount) {
+      setAccount(currentAccount); // 确保 account 状态是最新的
     }
-  };
+
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const contractWithSigner = contract.connect(signer);
+
+    const tx = await contractWithSigner.store(inputValue);
+    await tx.wait();
+    setInputValue("");
+  } catch (err) {
+    console.error(err);
+    setError("交易失败: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div style={{ padding: "2rem", maxWidth: "600px", margin: "0 auto", fontFamily: "sans-serif" }}>
@@ -130,6 +219,27 @@ function App() {
         >
           {loading ? "等待确认..." : "存储到链上"}
         </button>
+
+        
+      </div>
+
+
+      <h2>我的 LearnToken (LTK)</h2>
+      <p>余额: {tokenBalance} LTK</p>
+
+      <div>
+        <input
+          placeholder="收款地址"
+          value={transferTo}
+          onChange={(e) => setTransferTo(e.target.value)}
+        />
+        <input
+          placeholder="金额"
+          type="number"
+          value={transferAmount}
+          onChange={(e) => setTransferAmount(e.target.value)}
+        />
+        <button onClick={handleTransfer}>转账 LTK</button>
       </div>
 
       <div style={{ marginTop: "2rem", fontSize: "0.9rem", color: "#666" }}>
