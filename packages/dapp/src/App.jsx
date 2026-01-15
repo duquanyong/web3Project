@@ -37,6 +37,11 @@ function App() {
    // 转账
    const handleTransfer = async () => {
     if (!window.ethereum || !account) return;
+     // ✅ 银行级校验：防止用户输入无效地址（类似银行转账前校验）
+    if (!/0x[a-fA-F0-9]{40}/.test(transferTo)) {
+      setError("Invalid address format (must start with 0x and be 42 chars)");
+      return;
+    }
     const provider = new ethers.BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
     const contract = new ethers.Contract(TOKEN_ADDRESS, myTokenAbi, signer);
